@@ -1,0 +1,21 @@
+services:
+  gateway:
+    build: .
+    container_name: voice-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - WORKER_MANAGER_HOST=host.docker.internal
+      - WORKER_HOST=host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

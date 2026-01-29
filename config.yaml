@@ -1,0 +1,56 @@
+# Voice Insight API Configuration
+# Optimized for M4 Mac Mini 32GB
+
+models:
+  # STT Models (Speech-to-Text)
+  stt-fast:
+    type: "stt"
+    path: "mlx-community/whisper-large-v3-turbo"
+    hot_reload: true
+    params:
+      memory_gb: 1.5
+      batch_size: 12
+      language: null  # auto-detect
+
+  stt-best:
+    type: "stt"
+    path: "mlx-community/whisper-large-v3-mlx"
+    hot_reload: false
+    params:
+      memory_gb: 3.0
+      batch_size: 8
+      language: null
+
+  # TTS Models (Text-to-Speech)
+  tts-fast:
+    type: "tts"
+    path: "mlx-community/Kokoro-82M-bf16"
+    hot_reload: true
+    params:
+      memory_gb: 0.5
+      voice: "af_heart"
+      speed: 1.0
+
+  tts-stream:
+    type: "tts"
+    path: "Marvis-AI/marvis-tts-250m-v0.1"
+    hot_reload: false
+    params:
+      memory_gb: 1.0
+      streaming: true
+
+memory:
+  max_unified_memory_gb: 24  # Reserve 8GB for system
+  eviction_threshold_percent: 75
+  safety_margin_gb: 2.0
+
+gateway:
+  host: "0.0.0.0"
+  port: 8000
+
+workers:
+  manager_port: 8100
+  base_port: 8201
+  idle_timeout_seconds: 300
+  health_check_interval: 30
+  startup_timeout: 120

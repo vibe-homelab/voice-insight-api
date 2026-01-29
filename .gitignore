@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# uv
+.python-version
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Audio test files
+test.wav
+test-output.wav
+*.mp3
+*.m4a
+*.webm
+*.flac
+
+# Models (downloaded locally)
+models/
+
+# Secrets
+.env
+.env.*
