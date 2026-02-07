@@ -3,7 +3,7 @@ services:
     build: .
     container_name: voice-gateway
     ports:
-      - "8000:8000"
+      - "8200:8200"
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
@@ -13,9 +13,33 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+    depends_on:
+      worker-manager-check:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      test: ["CMD", "curl", "-f", "http://localhost:8200/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # This service checks that Worker Manager is running on host
+  worker-manager-check:
+    image: curlimages/curl:latest
+    command: >
+      sh -c "
+        echo 'Checking Worker Manager on host...' &&
+        for i in 1 2 3 4 5; do
+          if curl -sf http://host.docker.internal:8210/health; then
+            echo 'Worker Manager is running!'
+            exit 0
+          fi
+          echo 'Waiting for Worker Manager... (attempt $$i/5)'
+          sleep 2
+        done
+        echo 'ERROR: Worker Manager not running on host!'
+        echo 'Run: make service-install && make service-start'
+        exit 1
+      "
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

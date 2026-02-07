@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from fastapi import HTTPException
+from fastapi import Body, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -25,6 +25,16 @@ class TTSResponse(BaseModel):
     audio_base64: str
     format: str
     duration: Optional[float] = None
+
+
+class OpenAISpeechRequest(BaseModel):
+    """OpenAI-compatible request body for /v1/audio/speech."""
+
+    model: str = "tts-1"
+    input: str
+    voice: str = "alloy"
+    response_format: str = "wav"
+    speed: float = 1.0
 
 
 class TTSWorker(BaseWorker):
@@ -74,19 +84,30 @@ class TTSWorker(BaseWorker):
 
         @self.app.post("/v1/audio/speech")
         async def openai_speech(
-            model: str = "tts-1",
-            input: str = "",
-            voice: str = "alloy",
-            response_format: str = "wav",
-            speed: float = 1.0,
+            body: OpenAISpeechRequest | None = Body(default=None),
+            model: str = Query(default="tts-1"),
+            input_text: str = Query(default="", alias="input"),
+            voice: str = Query(default="alloy"),
+            response_format: str = Query(default="wav"),
+            speed: float = Query(default=1.0),
         ):
             """OpenAI-compatible speech endpoint."""
             try:
+                if body is not None:
+                    model = body.model
+                    input_text = body.input
+                    voice = body.voice
+                    response_format = body.response_format
+                    speed = body.speed
+
+                if not input_text:
+                    raise HTTPException(status_code=400, detail="Field 'input' is required")
+
                 # Map OpenAI voices to available voices
                 mapped_voice = self._map_voice(voice)
 
                 audio_data, _ = self._generate_audio(
-                    input,
+                    input_text,
                     voice=mapped_voice,
                     speed=speed,
                     format=response_format,

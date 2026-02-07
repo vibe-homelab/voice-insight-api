@@ -28,5 +28,5 @@ def test_config_memory():
 def test_config_workers():
     """Test worker configuration."""
     config = load_config("config.yaml")
-    assert config.workers.manager_port == 8100
+    assert config.workers.manager_port == 8210
     assert config.workers.idle_timeout_seconds == 300

@@ -67,7 +67,7 @@ status:
 	@docker compose ps 2>/dev/null || echo "Not running"
 	@echo ""
 	@echo "=== Worker Manager (Host) ==="
-	@curl -s http://localhost:8100/status 2>/dev/null | python3 -m json.tool || echo "Not running"
+	@curl -s http://localhost:8210/status 2>/dev/null | python3 -m json.tool || echo "Not running"
 
 # Testing
 test:
@@ -75,13 +75,13 @@ test:
 
 test-stt:
 	@echo "Testing STT..."
-	curl -X POST "http://localhost:8000/v1/audio/transcriptions" \
+	curl -X POST "http://localhost:8200/v1/audio/transcriptions" \
 		-F "file=@test.wav" \
 		-F "model=stt-fast"
 
 test-tts:
 	@echo "Testing TTS..."
-	curl -X POST "http://localhost:8000/v1/audio/speech" \
+	curl -X POST "http://localhost:8200/v1/audio/speech" \
 		-H "Content-Type: application/json" \
 		-d '{"input": "Hello, this is a test.", "model": "tts-fast"}' \
 		--output test-output.wav

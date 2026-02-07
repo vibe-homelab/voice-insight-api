@@ -1,5 +1,6 @@
 """Configuration loading and validation."""
 
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -35,12 +36,13 @@ class MemoryConfig(BaseModel):
 
 class GatewayConfig(BaseModel):
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 8200
+    api_key: str = ""
 
 
 class WorkersConfig(BaseModel):
-    manager_port: int = 8100
-    base_port: int = 8201
+    manager_port: int = 8210
+    base_port: int = 8211
     idle_timeout_seconds: int = 300
     health_check_interval: int = 30
     startup_timeout: int = 120
@@ -62,7 +64,22 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
     with open(path, "r") as f:
         data = yaml.safe_load(f)
 
-    return AppConfig(**data)
+    cfg = AppConfig(**data)
+
+    # Optional environment overrides (useful for container/runtime configs).
+    # Kept intentionally minimal and compatible with README variables.
+    if os.getenv("GATEWAY_PORT"):
+        cfg.gateway.port = int(os.environ["GATEWAY_PORT"])
+    if os.getenv("GATEWAY_API_KEY"):
+        cfg.gateway.api_key = os.environ["GATEWAY_API_KEY"]
+    if os.getenv("MANAGER_PORT"):
+        cfg.workers.manager_port = int(os.environ["MANAGER_PORT"])
+    if os.getenv("BASE_PORT"):
+        cfg.workers.base_port = int(os.environ["BASE_PORT"])
+    if os.getenv("IDLE_TIMEOUT"):
+        cfg.workers.idle_timeout_seconds = int(os.environ["IDLE_TIMEOUT"])
+
+    return cfg
 
 
 # Global config instance

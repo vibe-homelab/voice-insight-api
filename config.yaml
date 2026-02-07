@@ -46,11 +46,14 @@ memory:
 
 gateway:
   host: "0.0.0.0"
-  port: 8000
+  port: 8200  # 8000 is used by vision-insight-api
+  # Optional: set to a non-empty value to require auth on /v1/* endpoints.
+  # Clients can send either `Authorization: Bearer <key>` or `X-API-Key: <key>`.
+  api_key: ""
 
 workers:
-  manager_port: 8100
-  base_port: 8201
+  manager_port: 8210
+  base_port: 8211
   idle_timeout_seconds: 300
   health_check_interval: 30
   startup_timeout: 120

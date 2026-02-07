@@ -226,7 +226,10 @@ class WorkerManager:
                 "total_gb": round(memory.total_gb, 2),
                 "used_gb": round(memory.used_gb, 2),
                 "available_gb": round(memory.available_gb, 2),
+                "used_percent": round(memory.usage_percent, 1),
+                # Backward compatibility: older clients may still read this key.
                 "usage_percent": round(memory.usage_percent, 1),
+                "models_loaded_gb": round(sum(w.memory_gb for w in self.workers.values()), 2),
             },
             "workers": {
                 alias: {
@@ -237,6 +240,7 @@ class WorkerManager:
                     "uptime_seconds": int(time.time() - w.started_at),
                     "idle_seconds": int(time.time() - w.last_used),
                     "request_count": w.request_count,
+                    "pid": w.process.pid,
                 }
                 for alias, w in self.workers.items()
             },

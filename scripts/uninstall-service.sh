@@ -20,6 +20,6 @@ fi
 
 # Stop any running workers
 echo "Stopping any running workers..."
-curl -s -X POST http://localhost:8100/stop-all 2>/dev/null || true
+curl -s -X POST http://localhost:8210/stop-all 2>/dev/null || true
 
 echo "Service uninstalled"

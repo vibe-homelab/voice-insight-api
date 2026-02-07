@@ -1,0 +1,7 @@
+# Ignore benchmark results (generated files)
+*.wav
+*.mp3
+*.json
+
+# Keep the directory
+!.gitignore

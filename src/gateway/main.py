@@ -6,13 +6,16 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from src.core.config import get_config
 from src.core.supervisor import Supervisor
+
+_DEFAULT_API_KEYS = {"default-key", "default-key-change-me"}
+_config = get_config()
 
 
 # Request/Response Models
@@ -43,6 +46,16 @@ class SpeechResponse(BaseModel):
     duration: Optional[float] = None
 
 
+class OpenAISpeechRequest(BaseModel):
+    """OpenAI-compatible Text-to-Speech request body."""
+
+    model: str = "tts-fast"
+    input: str
+    voice: str = "af_heart"
+    response_format: str = "wav"
+    speed: float = 1.0
+
+
 class ModelInfo(BaseModel):
     id: str
     type: str
@@ -65,6 +78,36 @@ app.add_middleware(
 )
 
 supervisor = Supervisor()
+
+
+@app.middleware("http")
+async def api_key_auth_middleware(request, call_next):
+    """Optional API key auth for all /v1/* endpoints.
+
+    Enable by setting `gateway.api_key` in `config.yaml` to a non-empty value.
+    Clients may send either:
+    - Authorization: Bearer <api_key>
+    - X-API-Key: <api_key>
+    """
+    path = request.url.path
+    if not path.startswith("/v1/"):
+        return await call_next(request)
+
+    api_key = (_config.gateway.api_key or "").strip()
+    if not api_key or api_key in _DEFAULT_API_KEYS:
+        return await call_next(request)
+
+    auth = request.headers.get("authorization", "")
+    provided = ""
+    if auth.lower().startswith("bearer "):
+        provided = auth.split(" ", 1)[1].strip()
+    if not provided:
+        provided = (request.headers.get("x-api-key", "") or "").strip()
+
+    if provided != api_key:
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    return await call_next(request)
 
 
 # Health & Status
@@ -165,24 +208,35 @@ async def transcribe_base64(request: TranscriptionRequest):
 # TTS Endpoints
 @app.post("/v1/audio/speech")
 async def create_speech(
-    model: str = "tts-fast",
-    input: str = "",
-    voice: str = "af_heart",
-    response_format: str = "wav",
-    speed: float = 1.0,
+    body: OpenAISpeechRequest | None = Body(default=None),
+    model: str = Query(default="tts-fast"),
+    input_text: str = Query(default="", alias="input"),
+    voice: str = Query(default="af_heart"),
+    response_format: str = Query(default="wav"),
+    speed: float = Query(default=1.0),
 ):
     """
     Generate speech from text (OpenAI-compatible).
 
     Returns audio stream.
     """
+    if body is not None:
+        model = body.model
+        input_text = body.input
+        voice = body.voice
+        response_format = body.response_format
+        speed = body.speed
+
+    if not input_text:
+        raise HTTPException(status_code=400, detail="Field 'input' is required")
+
     worker = await supervisor.get_worker(model)
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
             f"{worker.address}/synthesize",
             json={
-                "text": input,
+                "text": input_text,
                 "voice": voice,
                 "speed": speed,
                 "format": response_format,
