@@ -121,6 +121,8 @@ Gateway 컨테이너 이미지는 GHCR로 배포됩니다.
 docker pull ghcr.io/vibe-homelab/voice-insight-api:latest
 ```
 
+> 이미지가 아직 없거나 접근이 안 되면, 이 레포를 클론해서 `make start`로 로컬 빌드/실행할 수 있습니다.
+
 ---
 
 ## API Reference
