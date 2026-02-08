@@ -2,6 +2,8 @@
 
 Mac Mini M4 (Apple Silicon)에서 MLX 가속을 활용한 로컬 음성 AI API 서버입니다.
 
+> Part of Vibe Homelab: https://vibe-homelab.github.io
+
 ## 기능
 
 | 태스크 | 엔드포인트 | 설명 |
@@ -10,6 +12,14 @@ Mac Mini M4 (Apple Silicon)에서 MLX 가속을 활용한 로컬 음성 AI API �
 | Audio → Text | `POST /v1/transcribe` | Base64 오디오 변환 |
 | Text → Audio | `POST /v1/audio/speech` | 텍스트를 음성으로 변환 (OpenAI 호환) |
 | Text → Audio | `POST /v1/synthesize` | Base64 응답 음성 합성 |
+
+## 포트/헬스체크
+
+| 구성요소 | 기본 포트 | 헬스 |
+|---|---:|---|
+| Gateway (Docker) | `8200` | `GET /healthz` |
+| Worker Manager (Host) | `8210` | `GET /health` |
+| Workers (Host) | `8211+` | `GET /health` |
 
 ## 아키텍처
 
@@ -41,23 +51,39 @@ Mac Mini M4 (Apple Silicon)에서 MLX 가속을 활용한 로컬 음성 AI API �
 └─────────────────────────────────────────────────────────┘
 ```
 
-## 빠른 시작
+## 빠른 시작 (권장)
 
-### 설치
+> 주의: MLX 워커는 **Host(macOS)**에서 실행되어야 하므로, Gateway 컨테이너만으로는 동작하지 않습니다.
+
+### 0) 준비물
+
+- Apple Silicon macOS (MLX 가속용)
+- Docker Desktop (Gateway 실행용)
+- `uv` (Worker Manager/Workers 실행용)
+
+### 1) 설치/실행
 
 ```bash
-# uv 설치 (없는 경우)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# (없는 경우) uv 설치
+# macOS: brew install uv
+# 또는: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 의존성 설치
+# 워커 의존성 설치 (MLX)
 make install-worker
 
 # 서비스 설치 및 시작
 make service-install
 make service-start
 
-# Gateway 시작
+# Gateway 시작 (Docker)
 make start
+```
+
+정상 기동 확인:
+
+```bash
+curl http://localhost:8210/health   # Worker Manager
+curl http://localhost:8200/healthz  # Gateway
 ```
 
 ### 사용
@@ -76,6 +102,23 @@ curl -X POST http://localhost:8200/v1/audio/speech \
 
 # 시스템 상태
 curl http://localhost:8200/v1/system/status
+```
+
+## Full Stack (Dashboard + Gateways)
+
+대시보드까지 포함해 한 번에 실행하려면 `vibe-homelab.github.io`의 스택 compose를 사용하세요:
+
+- Stack guide: `vibe-homelab.github.io/stack/README.md`
+- Compose: `vibe-homelab.github.io/stack/docker-compose.yml`
+
+## Docker 이미지 (GHCR)
+
+Gateway 컨테이너 이미지는 GHCR로 배포됩니다.
+
+> 이 이미지는 **Gateway만 포함**합니다. Worker Manager/Workers는 Host에서 실행해야 합니다.
+
+```bash
+docker pull ghcr.io/vibe-homelab/voice-insight-api:latest
 ```
 
 ---
@@ -239,8 +282,11 @@ make download-models  # 모델 미리 다운로드
 
 | 변수 | 기본값 | 설명 |
 |------|--------|------|
-| `IDLE_TIMEOUT` | 300 | 워커 자동 종료 시간 (초) |
+| `GATEWAY_PORT` | 8200 | Gateway 포트 |
+| `GATEWAY_API_KEY` | (없음) | Gateway `/v1/*` 인증 키 (옵션) |
 | `MANAGER_PORT` | 8210 | Worker Manager 포트 |
+| `BASE_PORT` | 8211 | Worker base 포트 (`BASE_PORT`, `BASE_PORT+1`, ...) |
+| `IDLE_TIMEOUT` | 300 | 워커 자동 종료 시간 (초) |
 
 ### 인증 (선택)
 
@@ -249,6 +295,18 @@ make download-models  # 모델 미리 다운로드
 
 - `Authorization: Bearer <api_key>`
 - `X-API-Key: <api_key>`
+
+## Troubleshooting
+
+| 증상 | 원인 | 해결 |
+|---|---|---|
+| `docker compose up`가 `worker-manager-check`에서 실패 | Host Worker Manager가 기동되지 않음 | `make service-start` 후 `curl http://localhost:8210/health` |
+| 첫 요청이 매우 느림 | 모델 다운로드/초기 로딩 | `make download-models` 또는 로그 확인(`make logs-manager`) |
+| `host.docker.internal` 연결 실패(리눅스 등) | Docker/OS 차이 | `WORKER_MANAGER_HOST`를 실제 호스트 IP로 설정하고 compose/설정 파일도 동일하게 맞추기 |
+
+## 벤치마크
+
+TTS/STT 성능 비교 스크립트는 `benchmarks/README.md`를 참고하세요.
 
 ---
 
