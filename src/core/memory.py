@@ -1,19 +1,29 @@
-"""Memory monitoring for Apple Silicon unified memory."""
+"""Memory monitoring for model allocation.
+Supports Apple Silicon unified memory (macOS) and system RAM (Linux).
+"""
 
+import platform
 import subprocess
 from dataclasses import dataclass
 from typing import Dict
 
+IS_LINUX = platform.system() == "Linux"
+IS_MACOS = platform.system() == "Darwin"
+
 # Model memory requirements (empirically measured)
 MODEL_MEMORY_REQUIREMENTS: Dict[str, float] = {
-    # STT Models
+    # MLX STT Models (macOS)
     "mlx-community/whisper-large-v3-turbo": 1.5,
     "mlx-community/whisper-large-v3-mlx": 3.0,
     "mlx-community/whisper-large-v3-turbo-asr-fp16": 1.5,
     "mlx-community/distil-whisper-large-v3": 1.2,
-    # TTS Models
+    # MLX TTS Models (macOS)
     "mlx-community/Kokoro-82M-bf16": 0.5,
     "Marvis-AI/marvis-tts-250m-v0.1": 1.0,
+    # CUDA STT Models (Linux/NVIDIA)
+    "mistralai/Voxtral-Mini-4B-Realtime-2602": 8.0,
+    # CUDA TTS Models (Linux/NVIDIA)
+    "Qwen/Qwen3-TTS-12Hz-1.7B-Base": 4.0,
 }
 
 
@@ -32,24 +42,51 @@ class MemoryStatus:
 
 
 def get_memory_status() -> MemoryStatus:
-    """Get current memory status using vm_stat (macOS)."""
+    """Get current memory status. Uses /proc/meminfo on Linux, vm_stat on macOS."""
+    if IS_LINUX:
+        return _get_linux_memory_status()
+    return _get_macos_memory_status()
+
+
+def _get_linux_memory_status() -> MemoryStatus:
+    """Get memory status on Linux using /proc/meminfo."""
     try:
-        # Get total memory from sysctl
+        with open("/proc/meminfo") as f:
+            meminfo = {}
+            for line in f:
+                parts = line.split(":")
+                if len(parts) == 2:
+                    key = parts[0].strip()
+                    val = parts[1].strip().split()[0]
+                    meminfo[key] = int(val) / (1024 * 1024)  # KB to GB
+
+        total = meminfo.get("MemTotal", 32.0)
+        available = meminfo.get("MemAvailable", total * 0.5)
+        used = total - available
+
+        return MemoryStatus(
+            total_gb=round(total, 2),
+            used_gb=round(used, 2),
+            available_gb=round(available, 2),
+            app_memory_gb=round(used, 2),
+            wired_gb=0.0,
+            compressed_gb=0.0,
+        )
+    except Exception:
+        return _get_fallback()
+
+
+def _get_macos_memory_status() -> MemoryStatus:
+    """Get memory status on macOS using vm_stat."""
+    try:
         total_result = subprocess.run(
             ["sysctl", "-n", "hw.memsize"],
-            capture_output=True,
-            text=True,
-            check=True,
+            capture_output=True, text=True, check=True,
         )
-        total_bytes = int(total_result.stdout.strip())
-        total_gb = total_bytes / (1024**3)
+        total_gb = int(total_result.stdout.strip()) / (1024**3)
 
-        # Parse vm_stat output
         vm_result = subprocess.run(
-            ["vm_stat"],
-            capture_output=True,
-            text=True,
-            check=True,
+            ["vm_stat"], capture_output=True, text=True, check=True,
         )
 
         stats = {}
@@ -62,13 +99,11 @@ def get_memory_status() -> MemoryStatus:
                 except ValueError:
                     pass
 
-        # Page size is typically 16KB on Apple Silicon
         page_size = 16384
 
         def pages_to_gb(pages: int) -> float:
             return (pages * page_size) / (1024**3)
 
-        # Calculate memory breakdown
         free_pages = stats.get("Pages free", 0)
         active_pages = stats.get("Pages active", 0)
         inactive_pages = stats.get("Pages inactive", 0)
@@ -77,37 +112,30 @@ def get_memory_status() -> MemoryStatus:
         compressed_pages = stats.get("Pages occupied by compressor", 0)
         purgeable_pages = stats.get("Pages purgeable", 0)
 
-        # Available = free + inactive + purgeable + speculative
         available_pages = free_pages + inactive_pages + purgeable_pages + speculative_pages
-
-        # App memory = active + wired
         app_memory_pages = active_pages + wired_pages
 
         available_gb = pages_to_gb(available_pages)
-        app_memory_gb = pages_to_gb(app_memory_pages)
-        wired_gb = pages_to_gb(wired_pages)
-        compressed_gb = pages_to_gb(compressed_pages)
         used_gb = total_gb - available_gb
 
         return MemoryStatus(
             total_gb=total_gb,
             used_gb=used_gb,
             available_gb=available_gb,
-            app_memory_gb=app_memory_gb,
-            wired_gb=wired_gb,
-            compressed_gb=compressed_gb,
+            app_memory_gb=pages_to_gb(app_memory_pages),
+            wired_gb=pages_to_gb(wired_pages),
+            compressed_gb=pages_to_gb(compressed_pages),
         )
 
-    except (subprocess.CalledProcessError, ValueError, KeyError) as e:
-        # Fallback with safe defaults
-        return MemoryStatus(
-            total_gb=32.0,
-            used_gb=16.0,
-            available_gb=16.0,
-            app_memory_gb=8.0,
-            wired_gb=4.0,
-            compressed_gb=2.0,
-        )
+    except (subprocess.CalledProcessError, ValueError, KeyError):
+        return _get_fallback()
+
+
+def _get_fallback() -> MemoryStatus:
+    return MemoryStatus(
+        total_gb=32.0, used_gb=16.0, available_gb=16.0,
+        app_memory_gb=8.0, wired_gb=4.0, compressed_gb=2.0,
+    )
 
 
 def get_model_memory_requirement(model_path: str, model_type: str) -> float:

@@ -18,9 +18,10 @@ class ModelParams(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    type: str  # "stt" or "tts"
+    type: str  # "stt", "tts", "cuda_stt", "cuda_tts"
     path: str  # HuggingFace model path
     hot_reload: bool = False
+    backend: str = "mlx"  # "mlx" or "cuda"
     params: Dict[str, Any] = {}
 
     @property

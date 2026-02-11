@@ -1,21 +1,30 @@
 # Voice Insight API Configuration
-# Optimized for M4 Mac Mini 32GB
+#
+# Platform support:
+#   macOS (Apple Silicon) - MLX backend: Whisper, Kokoro, Marvis
+#   Linux (NVIDIA CUDA)   - vLLM/PyTorch: Voxtral Mini, Qwen3-TTS
+#
+# Set VOICE_PLATFORM=cuda or VOICE_PLATFORM=mlx to override auto-detection.
 
 models:
+  # ── MLX Models (macOS Apple Silicon) ──────────────────────────
+
   # STT Models (Speech-to-Text)
   stt-fast:
     type: "stt"
     path: "mlx-community/whisper-large-v3-turbo"
     hot_reload: true
+    backend: "mlx"
     params:
       memory_gb: 1.5
       batch_size: 12
-      language: null  # auto-detect
+      language: null
 
   stt-best:
     type: "stt"
     path: "mlx-community/whisper-large-v3-mlx"
     hot_reload: false
+    backend: "mlx"
     params:
       memory_gb: 3.0
       batch_size: 8
@@ -26,6 +35,7 @@ models:
     type: "tts"
     path: "mlx-community/Kokoro-82M-bf16"
     hot_reload: true
+    backend: "mlx"
     params:
       memory_gb: 0.5
       voice: "af_heart"
@@ -35,20 +45,41 @@ models:
     type: "tts"
     path: "Marvis-AI/marvis-tts-250m-v0.1"
     hot_reload: false
+    backend: "mlx"
     params:
       memory_gb: 1.0
       streaming: true
 
+  # ── CUDA Models (Linux NVIDIA GPU) ───────────────────────────
+
+  # STT via Voxtral Mini 4B Realtime (vLLM serve)
+  stt-cuda:
+    type: "cuda_stt"
+    path: "mistralai/Voxtral-Mini-4B-Realtime-2602"
+    hot_reload: false
+    backend: "cuda"
+    params:
+      memory_gb: 8.0
+      gpu_memory_utilization: 0.85
+      max_model_len: 8192
+
+  # TTS via Qwen3-TTS (PyTorch)
+  tts-cuda:
+    type: "cuda_tts"
+    path: "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+    hot_reload: false
+    backend: "cuda"
+    params:
+      memory_gb: 4.0
+
 memory:
-  max_unified_memory_gb: 24  # Reserve 8GB for system
+  max_unified_memory_gb: 24
   eviction_threshold_percent: 75
   safety_margin_gb: 2.0
 
 gateway:
   host: "0.0.0.0"
-  port: 8200  # 8000 is used by vision-insight-api
-  # Optional: set to a non-empty value to require auth on /v1/* endpoints.
-  # Clients can send either `Authorization: Bearer <key>` or `X-API-Key: <key>`.
+  port: 8200
   api_key: ""
 
 workers:
@@ -56,4 +87,4 @@ workers:
   base_port: 8211
   idle_timeout_seconds: 300
   health_check_interval: 30
-  startup_timeout: 120
+  startup_timeout: 300  # CUDA models take longer to load

@@ -1,0 +1,13 @@
+# CUDA/PyTorch worker dependencies (Linux + NVIDIA GPU)
+
+# STT (Voxtral via vLLM)
+vllm
+soxr
+librosa
+soundfile
+httpx
+
+# TTS (Qwen3-TTS)
+qwen-tts
+soundfile
+flash-attn
