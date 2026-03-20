@@ -15,7 +15,8 @@ def test_healthz(client):
     """Test health endpoint."""
     response = client.get("/healthz")
     assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    data = response.json()
+    assert data["status"] in ("ok", "degraded")
 
 
 def test_list_models(client):

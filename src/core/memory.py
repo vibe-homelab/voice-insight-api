@@ -20,7 +20,8 @@ MODEL_MEMORY_REQUIREMENTS: Dict[str, float] = {
     # MLX TTS Models (macOS)
     "mlx-community/Kokoro-82M-bf16": 0.5,
     "mlx-community/Dia-1.6B-4bit": 0.8,
-    "mlx-community/csm-1b": 2.0,
+    "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-4bit": 0.4,
+    "mlx-community/parakeet-tdt-0.6b-v3": 2.5,
     # voxtral.c (macOS native)
     "./models/voxtral": 8.0,
     # CUDA STT Models (Linux/NVIDIA)

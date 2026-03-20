@@ -1,8 +1,8 @@
 # Voice Insight API Configuration
-# Updated: 2026-03 — Whisper v3 Turbo, Kokoro, Dia 1.6B, CSM (M4 Mac Mini 32GB)
+# Updated: 2026-03 — Whisper, Parakeet, Kokoro, Dia, Qwen3-TTS (M4 Mac Mini 32GB)
 #
 # Platform support:
-#   macOS (Apple Silicon) - MLX backend: Whisper, Kokoro, Dia, CSM
+#   macOS (Apple Silicon) - MLX backend: Whisper, Parakeet, Kokoro, Dia, Qwen3-TTS
 #   Linux (NVIDIA CUDA)   - vLLM/PyTorch: Voxtral Mini, Qwen3-TTS
 #
 # Set VOICE_PLATFORM=cuda or VOICE_PLATFORM=mlx to override auto-detection.
@@ -53,12 +53,22 @@ models:
 
   tts-clone:
     type: "tts"
-    path: "mlx-community/csm-1b"
+    path: "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-4bit"
     hot_reload: false
     backend: "mlx"
     params:
-      memory_gb: 2.0
+      memory_gb: 0.4
       voice_cloning: true
+
+  stt-parakeet:
+    type: "stt"
+    path: "mlx-community/parakeet-tdt-0.6b-v3"
+    hot_reload: true
+    backend: "mlx"
+    params:
+      memory_gb: 2.5
+      batch_size: 12
+      language: null
 
   # ── voxtral.c (macOS native, Metal GPU) ─────────────────────
   # Pure C implementation of Voxtral Realtime 4B.

@@ -243,7 +243,8 @@ Response:
 | `stt-best` | Whisper Large V3 | 고품질 음성 인식 | ~3GB |
 | `tts-fast` | Kokoro 82M | 빠른 음성 합성 | ~0.5GB |
 | `tts-quality` | Dia 1.6B | 고품질 다화자 대화 TTS | ~0.8GB |
-| `tts-clone` | CSM 1B (Sesame) | 음성 클로닝 | ~2GB |
+| `tts-clone` | Qwen3-TTS 0.6B CustomVoice | 음성 클로닝 | ~0.4GB |
+| `stt-parakeet` | Parakeet TDT 0.6B v3 | 다국어 빠른 음성 인식 (25개 언어) | ~2.5GB |
 
 ---
 

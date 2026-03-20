@@ -17,6 +17,9 @@ from src.core.supervisor import Supervisor
 _DEFAULT_API_KEYS = {"default-key", "default-key-change-me"}
 _config = get_config()
 
+MAX_UPLOAD_SIZE_MB = 500
+MAX_TTS_INPUT_LENGTH = 10000
+
 
 # Request/Response Models
 class TranscriptionRequest(BaseModel):
@@ -113,7 +116,13 @@ async def api_key_auth_middleware(request, call_next):
 # Health & Status
 @app.get("/healthz")
 async def healthz():
-    return {"status": "healthy"}
+    try:
+        connected = await supervisor.health_check()
+        if connected:
+            return {"status": "ok", "supervisor": "connected"}
+    except Exception:
+        pass
+    return {"status": "degraded", "supervisor": "disconnected"}
 
 
 @app.get("/v1/models")
@@ -160,11 +169,25 @@ async def transcribe_audio(
 
     Supported formats: wav, mp3, m4a, webm, flac
     """
+    # Validate file size
+    if file.size is not None and file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum upload size is {MAX_UPLOAD_SIZE_MB} MB.",
+        )
+
     # Get worker
     worker = await supervisor.get_worker(model)
 
     # Forward request
     audio_data = await file.read()
+
+    # Check actual size if file.size was not available
+    if len(audio_data) > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum upload size is {MAX_UPLOAD_SIZE_MB} MB.",
+        )
     audio_b64 = base64.b64encode(audio_data).decode()
 
     async with httpx.AsyncClient(timeout=120.0) as client:
@@ -229,6 +252,12 @@ async def create_speech(
 
     if not input_text:
         raise HTTPException(status_code=400, detail="Field 'input' is required")
+
+    if len(input_text) > MAX_TTS_INPUT_LENGTH:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Input text too long. Maximum length is {MAX_TTS_INPUT_LENGTH} characters.",
+        )
 
     worker = await supervisor.get_worker(model)
 
