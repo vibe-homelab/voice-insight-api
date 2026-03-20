@@ -21,7 +21,7 @@ def test_config_models():
 def test_config_memory():
     """Test memory configuration."""
     config = load_config("config.yaml")
-    assert config.memory.max_unified_memory_gb == 24
+    assert config.memory.max_unified_memory_gb == 32
     assert config.memory.safety_margin_gb == 2.0
 
 
