@@ -180,7 +180,7 @@ curl -X POST http://localhost:8200/v1/audio/transcriptions \
 | 필드 | 타입 | 기본값 | 설명 |
 |------|------|--------|------|
 | `input` | string | (필수) | 변환할 텍스트 |
-| `model` | string | "tts-fast" | 모델 (`tts-fast`, `tts-stream`) |
+| `model` | string | "tts-fast" | 모델 (`tts-fast`, `tts-quality`, `tts-clone`) |
 | `voice` | string | "af_heart" | 음성 종류 |
 | `speed` | float | 1.0 | 재생 속도 (0.5~2.0) |
 
@@ -242,7 +242,8 @@ Response:
 | `stt-fast` | Whisper Large V3 Turbo | 빠른 음성 인식 | ~1.5GB |
 | `stt-best` | Whisper Large V3 | 고품질 음성 인식 | ~3GB |
 | `tts-fast` | Kokoro 82M | 빠른 음성 합성 | ~0.5GB |
-| `tts-stream` | Marvis TTS 250M | 스트리밍 음성 합성 | ~1GB |
+| `tts-quality` | Dia 1.6B | 고품질 다화자 대화 TTS | ~0.8GB |
+| `tts-clone` | CSM 1B (Sesame) | 음성 클로닝 | ~2GB |
 
 ---
 

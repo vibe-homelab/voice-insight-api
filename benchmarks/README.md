@@ -25,7 +25,7 @@ benchmarks/
 ./scripts/test-tts.sh
 
 # Custom model/voice
-MODEL=tts-stream VOICE=af_sky ./scripts/test-tts.sh
+MODEL=tts-quality VOICE=af_sky ./scripts/test-tts.sh
 ```
 
 ### 2. STT Benchmark
