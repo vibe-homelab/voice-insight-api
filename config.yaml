@@ -1,7 +1,8 @@
 # Voice Insight API Configuration
+# Updated: 2026-03 — Whisper v3 Turbo, Kokoro, Dia 1.6B, CSM (M4 Mac Mini 32GB)
 #
 # Platform support:
-#   macOS (Apple Silicon) - MLX backend: Whisper, Kokoro, Marvis
+#   macOS (Apple Silicon) - MLX backend: Whisper, Kokoro, Dia, CSM
 #   Linux (NVIDIA CUDA)   - vLLM/PyTorch: Voxtral Mini, Qwen3-TTS
 #
 # Set VOICE_PLATFORM=cuda or VOICE_PLATFORM=mlx to override auto-detection.
@@ -41,14 +42,37 @@ models:
       voice: "af_heart"
       speed: 1.0
 
-  tts-stream:
+  tts-quality:
     type: "tts"
-    path: "Marvis-AI/marvis-tts-250m-v0.1"
+    path: "mlx-community/Dia-1.6B-4bit"
     hot_reload: false
     backend: "mlx"
     params:
-      memory_gb: 1.0
+      memory_gb: 0.8
       streaming: true
+
+  tts-clone:
+    type: "tts"
+    path: "mlx-community/csm-1b"
+    hot_reload: false
+    backend: "mlx"
+    params:
+      memory_gb: 2.0
+      voice_cloning: true
+
+  # ── voxtral.c (macOS native, Metal GPU) ─────────────────────
+  # Pure C implementation of Voxtral Realtime 4B.
+  # Run: bash scripts/setup-voxtralc.sh
+
+  stt-voxtralc:
+    type: "voxtralc_stt"
+    path: "./models/voxtral"
+    hot_reload: false
+    backend: "voxtralc"
+    params:
+      memory_gb: 8.0
+      binary_path: "./bin/voxtral"
+      interval: 2.0
 
   # ── CUDA Models (Linux NVIDIA GPU) ───────────────────────────
 
@@ -73,7 +97,7 @@ models:
       memory_gb: 4.0
 
 memory:
-  max_unified_memory_gb: 24
+  max_unified_memory_gb: 32
   eviction_threshold_percent: 75
   safety_margin_gb: 2.0
 

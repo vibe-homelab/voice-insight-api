@@ -1,6 +1,7 @@
 """Worker Manager - Manages worker lifecycle on macOS host."""
 
 import asyncio
+import json
 import os
 import signal
 import subprocess
@@ -46,13 +47,18 @@ class WorkerManager:
         self._next_port += 1
         return port
 
+    _WORKER_MODULES = {
+        "stt": "src.workers.stt_worker",
+        "tts": "src.workers.tts_worker",
+        "cuda_stt": "src.workers.cuda_stt_worker",
+        "cuda_tts": "src.workers.cuda_tts_worker",
+        "voxtralc_stt": "src.workers.voxtralc_stt_worker",
+    }
+
     def _get_worker_command(self, model_config: ModelConfig, alias: str, port: int) -> list:
         """Get command to spawn worker."""
-        if model_config.type == "stt":
-            module = "src.workers.stt_worker"
-        elif model_config.type == "tts":
-            module = "src.workers.tts_worker"
-        else:
+        module = self._WORKER_MODULES.get(model_config.type)
+        if module is None:
             raise ValueError(f"Unknown model type: {model_config.type}")
 
         return [
@@ -93,12 +99,18 @@ class WorkerManager:
             print(f"Spawning worker: {alias} on port {port}")
             print(f"Command: {' '.join(cmd)}")
 
+            spawn_env = {
+                **os.environ,
+                "PYTHONUNBUFFERED": "1",
+                "WORKER_PARAMS": json.dumps(model_config.params),
+            }
+
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 preexec_fn=os.setsid,
-                env={**os.environ, "PYTHONUNBUFFERED": "1"},
+                env=spawn_env,
             )
 
             worker = WorkerProcess(

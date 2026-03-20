@@ -20,6 +20,8 @@ MODEL_MEMORY_REQUIREMENTS: Dict[str, float] = {
     # MLX TTS Models (macOS)
     "mlx-community/Kokoro-82M-bf16": 0.5,
     "Marvis-AI/marvis-tts-250m-v0.1": 1.0,
+    # voxtral.c (macOS native)
+    "./models/voxtral": 8.0,
     # CUDA STT Models (Linux/NVIDIA)
     "mistralai/Voxtral-Mini-4B-Realtime-2602": 8.0,
     # CUDA TTS Models (Linux/NVIDIA)
@@ -155,6 +157,9 @@ def get_model_memory_requirement(model_path: str, model_type: str) -> float:
         if "small" in model_path.lower():
             return 0.5
         return 2.0  # Default for STT
+
+    if model_type == "voxtralc_stt":
+        return 8.0  # Voxtral Realtime 4B
 
     if model_type == "tts":
         if "250m" in model_path.lower():

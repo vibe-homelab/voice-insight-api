@@ -40,6 +40,10 @@ test-output.wav
 # Models (downloaded locally)
 models/
 
+# Build artifacts (voxtral.c etc.)
+bin/
+.build/
+
 # Secrets
 .env
 .env.*
