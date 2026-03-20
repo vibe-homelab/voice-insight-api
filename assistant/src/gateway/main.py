@@ -46,6 +46,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+MAX_AUDIO_SIZE_MB = 25
+
+
+def _sanitize_header(value: str, max_len: int = 512) -> str:
+    """Remove control chars and limit length for safe HTTP headers."""
+    clean = "".join(c for c in value if 32 <= ord(c) < 127)
+    return clean[:max_len]
+
 
 # ---------------------------------------------------------------------------
 # Health
@@ -77,6 +85,8 @@ async def voice_chat(
     audio_data = await file.read()
     if not audio_data:
         raise HTTPException(status_code=400, detail="Empty audio file")
+    if len(audio_data) > MAX_AUDIO_SIZE_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"Audio file exceeds {MAX_AUDIO_SIZE_MB}MB limit")
 
     # STT
     try:
@@ -117,8 +127,8 @@ async def voice_chat(
         content=audio_out,
         media_type="audio/wav",
         headers={
-            "X-Transcription": urllib.parse.quote(transcription),
-            "X-Response-Text": urllib.parse.quote(response_text),
+            "X-Transcription": _sanitize_header(urllib.parse.quote(transcription)),
+            "X-Response-Text": _sanitize_header(urllib.parse.quote(response_text)),
             "X-Session-Id": session_id,
         },
     )
@@ -166,7 +176,7 @@ async def voice_speak(req: SpeakRequest):
         content=audio_out,
         media_type="audio/wav",
         headers={
-            "X-Response-Text": urllib.parse.quote(response_text),
+            "X-Response-Text": _sanitize_header(urllib.parse.quote(response_text)),
             "X-Session-Id": session_id,
         },
     )
@@ -187,6 +197,8 @@ async def voice_listen(
     audio_data = await file.read()
     if not audio_data:
         raise HTTPException(status_code=400, detail="Empty audio file")
+    if len(audio_data) > MAX_AUDIO_SIZE_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"Audio file exceeds {MAX_AUDIO_SIZE_MB}MB limit")
 
     # STT
     try:
