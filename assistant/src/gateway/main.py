@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 import urllib.parse
 from contextlib import asynccontextmanager
@@ -47,6 +48,7 @@ app = FastAPI(
 )
 
 MAX_AUDIO_SIZE_MB = 25
+MAX_MESSAGE_LENGTH = 2000
 
 
 def _sanitize_header(value: str, max_len: int = 512) -> str:
@@ -97,6 +99,9 @@ async def voice_chat(
         )
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"STT service error: {exc}")
+
+    # Truncate overly long transcriptions
+    transcription = transcription[:MAX_MESSAGE_LENGTH].strip()
 
     # LLM
     conversation.add_message(session_id, "user", transcription)
@@ -210,6 +215,9 @@ async def voice_listen(
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"STT service error: {exc}")
 
+    # Truncate overly long transcriptions
+    transcription = transcription[:MAX_MESSAGE_LENGTH].strip()
+
     # LLM
     conversation.add_message(session_id, "user", transcription)
     messages = conversation.get_messages(session_id)
@@ -251,18 +259,23 @@ async def get_session(session_id: str):
 # ---------------------------------------------------------------------------
 @app.get("/v1/pipeline/status")
 async def pipeline_status():
-    """Check latency of each backend service."""
-    results: dict[str, dict] = {}
-    for name, client in [
-        ("stt", stt_client),
-        ("llm", llm_client),
-        ("tts", tts_client),
-    ]:
+    """Check latency of each backend service (in parallel)."""
+
+    async def check_service(name: str, client):
         t0 = time.monotonic()
-        ok = await client.health()
+        try:
+            ok = await asyncio.wait_for(client.health(), timeout=5.0)
+        except asyncio.TimeoutError:
+            ok = False
         latency_ms = round((time.monotonic() - t0) * 1000, 1)
-        results[name] = {"healthy": ok, "latency_ms": latency_ms}
-    return results
+        return name, {"healthy": ok, "latency_ms": latency_ms}
+
+    results = await asyncio.gather(
+        check_service("stt", stt_client),
+        check_service("llm", llm_client),
+        check_service("tts", tts_client),
+    )
+    return dict(results)
 
 
 # ---------------------------------------------------------------------------

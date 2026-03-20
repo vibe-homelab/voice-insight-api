@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class STTClient:
@@ -39,7 +43,14 @@ class STTClient:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(f"{self.endpoint}/health")
                 return resp.status_code == 200
-        except httpx.HTTPError:
+        except httpx.ConnectError:
+            logger.warning("Service connection failed: %s", self.endpoint)
+            return False
+        except httpx.TimeoutException:
+            logger.warning("Service health check timeout: %s", self.endpoint)
+            return False
+        except Exception as e:
+            logger.warning("Service health check error: %s: %s", self.endpoint, e)
             return False
 
 
@@ -70,7 +81,14 @@ class LLMClient:
                 json=payload,
             )
             resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+            data = resp.json()
+            try:
+                content = data["choices"][0]["message"]["content"]
+                if not isinstance(content, str) or not content.strip():
+                    raise ValueError("Empty LLM response")
+                return content
+            except (KeyError, IndexError, TypeError, ValueError) as e:
+                raise ValueError(f"Invalid LLM response: {e}") from e
 
     async def health(self) -> bool:
         """Return True if the LLM service is reachable."""
@@ -78,7 +96,14 @@ class LLMClient:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(f"{self.endpoint}/health")
                 return resp.status_code == 200
-        except httpx.HTTPError:
+        except httpx.ConnectError:
+            logger.warning("Service connection failed: %s", self.endpoint)
+            return False
+        except httpx.TimeoutException:
+            logger.warning("Service health check timeout: %s", self.endpoint)
+            return False
+        except Exception as e:
+            logger.warning("Service health check error: %s: %s", self.endpoint, e)
             return False
 
 
@@ -118,5 +143,12 @@ class TTSClient:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(f"{self.endpoint}/health")
                 return resp.status_code == 200
-        except httpx.HTTPError:
+        except httpx.ConnectError:
+            logger.warning("Service connection failed: %s", self.endpoint)
+            return False
+        except httpx.TimeoutException:
+            logger.warning("Service health check timeout: %s", self.endpoint)
+            return False
+        except Exception as e:
+            logger.warning("Service health check error: %s: %s", self.endpoint, e)
             return False
