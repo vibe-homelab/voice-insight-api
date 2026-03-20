@@ -21,6 +21,12 @@ ENV PYTHONUNBUFFERED=1
 ENV WORKER_MANAGER_HOST=host.docker.internal
 ENV WORKER_HOST=host.docker.internal
 
+RUN useradd -m -r appuser && chown -R appuser:appuser /app
+USER appuser
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:8200/healthz || exit 1
+
 EXPOSE 8200
 
 CMD ["python", "-m", "src.gateway.main"]
