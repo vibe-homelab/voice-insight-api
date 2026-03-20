@@ -1,0 +1,26 @@
+# Voice Assistant Pipeline Configuration
+
+services:
+  stt:
+    endpoint: "http://localhost:8200"
+    model: "stt-fast"
+    language: null  # auto-detect
+
+  llm:
+    endpoint: "http://localhost:8400"
+    model: "llm-small"
+    system_prompt: "You are a helpful voice assistant. Keep responses concise and conversational (2-3 sentences max)."
+    max_tokens: 256
+    temperature: 0.7
+
+  tts:
+    endpoint: "http://localhost:8200"
+    model: "tts-fast"
+    voice: "af_heart"
+    speed: 1.0
+
+pipeline:
+  host: "0.0.0.0"
+  port: 8800
+  max_audio_duration_seconds: 60
+  conversation_history_limit: 10
