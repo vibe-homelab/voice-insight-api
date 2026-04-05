@@ -82,11 +82,45 @@ app.add_middleware(
 
 supervisor = Supervisor()
 
+import asyncio
 import logging
 import time
 import uuid
 
 logger = logging.getLogger(__name__)
+
+
+async def _get_worker_or_fail(alias: str):
+    """Get worker with friendly cold-start error handling."""
+    try:
+        return await supervisor.get_worker(alias)
+    except MemoryError as e:
+        raise HTTPException(
+            status_code=507,
+            detail={
+                "error": "insufficient_memory",
+                "message": str(e),
+                "hint": "Evict unused models via POST /v1/system/evict/{alias}",
+            },
+        )
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "service_unavailable",
+                "message": str(e),
+                "hint": "Worker Manager may not be running. Check: curl http://localhost:8210/health",
+            },
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "worker_startup_failed",
+                "message": f"Model loading failed: {e}",
+                "hint": "Model may still be downloading or loading. Retry in 30-60 seconds.",
+            },
+        )
 
 
 @app.middleware("http")
@@ -165,9 +199,50 @@ async def list_models() -> Dict[str, List[ModelInfo]]:
 async def system_status():
     """Get system and worker status."""
     try:
-        return await supervisor.get_status()
-    except Exception as e:
-        return {"error": str(e)}
+        manager_status = await supervisor.get_status()
+    except Exception:
+        manager_status = {"workers": {}, "memory": {}}
+
+    # Add model availability info
+    config = get_config()
+    loaded = set(manager_status.get("workers", {}).keys())
+    models_status = {}
+    for alias, model_cfg in config.models.items():
+        if model_cfg.backend != "mlx":
+            continue
+        models_status[alias] = {
+            "path": model_cfg.path,
+            "status": "loaded" if alias in loaded else "unloaded",
+            "memory_gb": model_cfg.parsed_params.memory_gb,
+        }
+
+    return {
+        **manager_status,
+        "models": models_status,
+    }
+
+
+@app.post("/v1/system/warm/{alias}")
+async def warm_model(alias: str):
+    """Trigger model loading in background without waiting. Returns immediately."""
+    config = get_config()
+    if alias not in config.models:
+        raise HTTPException(status_code=404, detail=f"Unknown model: {alias}")
+
+    async def _warm():
+        try:
+            await supervisor.get_worker(alias)
+        except Exception as e:
+            logger.warning("Warm-up failed for %s: %s", alias, e)
+
+    asyncio.create_task(_warm())
+    return {
+        "status": "warming",
+        "alias": alias,
+        "model": config.models[alias].path,
+        "estimated_seconds": 30,
+        "hint": "Check GET /v1/system/status to see when ready",
+    }
 
 
 @app.post("/v1/system/evict/{alias}")
@@ -197,7 +272,7 @@ async def transcribe_audio(
         )
 
     # Get worker
-    worker = await supervisor.get_worker(model)
+    worker = await _get_worker_or_fail(model)
 
     # Forward request
     audio_data = await file.read()
@@ -230,7 +305,7 @@ async def transcribe_audio(
 @app.post("/v1/transcribe", response_model=TranscriptionResponse)
 async def transcribe_base64(request: TranscriptionRequest):
     """Transcribe audio from base64."""
-    worker = await supervisor.get_worker(request.model)
+    worker = await _get_worker_or_fail(request.model)
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
@@ -279,7 +354,7 @@ async def create_speech(
             detail=f"Input text too long. Maximum length is {MAX_TTS_INPUT_LENGTH} characters.",
         )
 
-    worker = await supervisor.get_worker(model)
+    worker = await _get_worker_or_fail(model)
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
@@ -308,7 +383,7 @@ async def create_speech(
 @app.post("/v1/synthesize", response_model=SpeechResponse)
 async def synthesize_speech(request: SpeechRequest):
     """Generate speech from text (returns base64)."""
-    worker = await supervisor.get_worker(request.model)
+    worker = await _get_worker_or_fail(request.model)
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
@@ -332,7 +407,7 @@ async def synthesize_speech(request: SpeechRequest):
 async def list_voices(model: str = "tts-fast"):
     """List available voices for a TTS model."""
     try:
-        worker = await supervisor.get_worker(model)
+        worker = await _get_worker_or_fail(model)
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(f"{worker.address}/voices")
