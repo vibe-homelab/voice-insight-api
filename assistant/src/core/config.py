@@ -72,4 +72,14 @@ def load_config(path: str | Path | None = None) -> AppConfig:
     with open(path) as f:
         raw = yaml.safe_load(f) or {}
 
-    return AppConfig.model_validate(raw)
+    cfg = AppConfig.model_validate(raw)
+
+    # Environment variable overrides (useful for Docker)
+    if os.getenv("STT_ENDPOINT"):
+        cfg.services.stt.endpoint = os.environ["STT_ENDPOINT"]
+    if os.getenv("LLM_ENDPOINT"):
+        cfg.services.llm.endpoint = os.environ["LLM_ENDPOINT"]
+    if os.getenv("TTS_ENDPOINT"):
+        cfg.services.tts.endpoint = os.environ["TTS_ENDPOINT"]
+
+    return cfg
